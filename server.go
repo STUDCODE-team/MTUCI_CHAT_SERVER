@@ -2,6 +2,8 @@ package main
 
 import (
 	// "fmt"
+	"fmt"
+	"strconv"
 
 	"log"
 	"net"
@@ -23,10 +25,42 @@ func connectDB() {
 	}
 }
 
-func authUser(login, hashedPassword string) bool {
+func authUser(login, hashedPassword string) (int, bool) {
 	id := 0
 	err := DB.QueryRow("SELECT id FROM users WHERE login=$1 AND password=$2", login, hashedPassword).Scan(&id)
-	return err == nil
+	return id, err == nil
+}
+
+type ChatInfo struct {
+	chat_id       int
+	to_id         int
+	to_name       string
+	to_avatarPath string
+}
+
+func getChatList(userID int) []ChatInfo {
+	query :=
+		`
+		SELECT chatList.id, chatList.to_id, userData.name, userData.avatarPath
+		FROM chatList 
+		JOIN userData
+		ON chatList.from_id = $1 AND chatList.to_id = userData.id
+	`
+	rows, _ := DB.Query(query, userID)
+	defer rows.Close()
+
+	packet := []ChatInfo{}
+
+	for rows.Next() {
+		chat := ChatInfo{}
+
+		if err := rows.Scan(&chat.chat_id, &chat.to_id,
+			&chat.to_name, &chat.to_avatarPath); err != nil {
+			log.Fatal(err)
+		}
+		packet = append(packet, chat)
+	}
+	return packet
 }
 
 func main() {
@@ -76,19 +110,26 @@ func handle(con net.Conn) {
 		}
 	}()
 
-	if userAuthorized {
-		log.Fatal()
-	}
-
 	//sending replies to client in the loop
 	for {
 		select {
 		case reply := <-replyChan:
+
+			if !userAuthorized && messageType(reply) != "login" {
+				con.Write([]byte("login:fail"))
+				continue
+			}
+
 			switch messageType(reply) {
 
 			case "login":
-				userAuthorized = (messageBody(reply) == "ok")
+				userAuthorized = (messageBody(reply) != "fail")
 				con.Write([]byte(reply))
+
+			case "chatList":
+				fmt.Println(reply)
+				con.Write([]byte(reply))
+
 			}
 
 		}
@@ -107,20 +148,33 @@ func parseRequest(request string, replyChan chan string) {
 		switch messageType(request) {
 
 		///
-		///
-		///
-		///
 		case "login":
 			requestBoby := messageBody(request)
 			login := strings.Split(requestBoby, "|")[0]
 			passwordHash := strings.Split(requestBoby, "|")[1]
-			if authUser(login, passwordHash) {
-				replyChan <- "login:ok"
+
+			if id, ok := authUser(login, passwordHash); ok {
+				replyChan <- "login:" + strconv.Itoa(id)
 			} else {
 				replyChan <- "login:fail"
 			}
-
+		///
+		///
+		///
+		case "getChatList":
+			id, _ := strconv.Atoi(messageBody(request))
+			packet := getChatList(id)
+			for _, item := range packet {
+				replyChan <- "chatList:" +
+					strconv.Itoa(item.chat_id) + ":" +
+					strconv.Itoa(item.to_id) + ":" +
+					item.to_name + ":" +
+					item.to_avatarPath
+			}
 		}
+		///
+		///
+		///
 	}
 }
 
