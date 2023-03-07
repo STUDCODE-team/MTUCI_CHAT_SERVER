@@ -26,27 +26,6 @@ func (db *Database) authUser(login, hashedPassword string) (int, bool) {
 	return id, err == nil
 }
 
-type ChatInfo struct {
-	chat_id           string
-	to_id             string
-	to_name           string
-	to_avatarPath     string
-	last_message      string
-	last_message_time string
-	last_message_id   string
-}
-
-func (chat ChatInfo) getString() string {
-	return "chatList:" +
-		chat.chat_id + "|" +
-		chat.to_id + "|" +
-		chat.to_name + "|" +
-		chat.to_avatarPath + "|" +
-		chat.last_message + "|" +
-		chat.last_message_time + "|" +
-		chat.last_message_id
-}
-
 func (db *Database) getChatList(userID int) []ChatInfo {
 	packet := []ChatInfo{}
 	query :=
@@ -114,7 +93,34 @@ func (db *Database) getChatList(userID int) []ChatInfo {
 			log.Fatal(err, chat)
 		}
 		packet = append(packet, chat)
-	}
 
+	}
+	return packet
+}
+
+func (db *Database) getMessages(chatID, userID string) []MessageInfo {
+	packet := []MessageInfo{}
+	query :=
+		`
+		SELECT message, user_id
+		FROM messages
+		WHERE messages.chat_id = ?
+		ORDER BY messages.id ASC
+		`
+	rows, _ := db.DB.Query(query, chatID)
+	defer rows.Close()
+	for rows.Next() {
+		mess := MessageInfo{}
+		err := rows.Scan(&mess.message, &mess.fromMe)
+		if mess.fromMe == userID {
+			mess.fromMe = "true"
+		} else {
+			mess.fromMe = "false"
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		packet = append(packet, mess)
+	}
 	return packet
 }

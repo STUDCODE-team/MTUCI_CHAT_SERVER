@@ -61,6 +61,9 @@ func (pipe *ConnPipe) runReplyPipe() {
 			case "chatList":
 				pipe.write(reply)
 
+			case "Message":
+				pipe.write(reply)
+
 			}
 		}
 	}
@@ -87,14 +90,19 @@ func (pipe *ConnPipe) parseRequest(request string) {
 		case "login":
 			pipe.replyChan <- login(request)
 		///
-
 		case "getChatList":
 			for _, chat := range getChats(request) {
-
 				pipe.replyChan <- chat.getString()
 			}
+			///
+
+		case "getMessages":
+			for _, message := range getMessages(request) {
+				pipe.replyChan <- message.getString()
+			}
+			///
 		}
-		///
+
 	}
 }
 
@@ -102,5 +110,5 @@ func messageType(message string) string {
 	return strings.Split(message, ":")[0]
 }
 func messageBody(message string) string {
-	return strings.Join(strings.Split(message, ":")[1:], "")
+	return strings.Join(strings.Split(message, ":")[1:], ":")
 }

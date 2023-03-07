@@ -21,3 +21,8 @@ func getChats(request string) []ChatInfo {
 	id, _ := strconv.Atoi(messageBody(request))
 	return db.getChatList(id)
 }
+
+func getMessages(request string) []MessageInfo {
+	body := strings.Split(messageBody(request), ":")
+	return db.getMessages(body[0], body[1])
+}
