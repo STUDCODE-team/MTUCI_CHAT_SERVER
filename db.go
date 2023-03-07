@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
 	"database/sql"
+	"log"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -10,48 +11,110 @@ type Database struct {
 	DB *sql.DB
 }
 
-func (db Database) handle() {
-	connStr := "admin_root:tTWOKQ0yd0@/admin_mtuci"
+func (db *Database) handle() {
+	connStr := "admin_root:tTWOKQ0yd0@tcp(5.253.62.248:3306)/admin_mtuci"
 	db.DB, _ = sql.Open("mysql", connStr)
+	db.DB.SetMaxIdleConns(0)
 	if err := db.DB.Ping(); err != nil {
 		log.Panic(err)
 	}
 }
 
-func (db Database) authUser(login, hashedPassword string) (int, bool) {
+func (db *Database) authUser(login, hashedPassword string) (int, bool) {
 	id := 0
-	err := db.DB.QueryRow("SELECT id FROM users WHERE login=? AND hash=$?", login, hashedPassword).Scan(&id)
+	err := db.DB.QueryRow("SELECT id FROM users WHERE login=? AND hash=?", login, hashedPassword).Scan(&id)
 	return id, err == nil
 }
 
 type ChatInfo struct {
-	chat_id       int
-	to_id         int
-	to_name       string
-	to_avatarPath string
+	chat_id           string
+	to_id             string
+	to_name           string
+	to_avatarPath     string
+	last_message      string
+	last_message_time string
+	last_message_id   string
 }
 
-func (db Database) getChatList(userID int) []ChatInfo {
+func (chat ChatInfo) getString() string {
+	return "chatList:" +
+		chat.chat_id + "|" +
+		chat.to_id + "|" +
+		chat.to_name + "|" +
+		chat.to_avatarPath + "|" +
+		chat.last_message + "|" +
+		chat.last_message_time + "|" +
+		chat.last_message_id
+}
+
+func (db *Database) getChatList(userID int) []ChatInfo {
+	packet := []ChatInfo{}
 	query :=
 		`
-		SELECT chatList.id, chatList.to_id, userData.name, userData.avatarPath
-		FROM chatList 
-		JOIN userData
-		ON chatList.from_id = ? AND chatList.to_id = userData.id
-	`
+		SELECT e.id as "CHAT ID", m.user_id as "TO USER", u.name as "TO NAME", u.avatar as "TO AVATAR",
+		mes.message as "TEXT", mes.time as "TIME", mes.id as "MESSAGE ID"
+		FROM chats e
+
+		INNER JOIN chats m
+		ON e.user_id = ? AND e.id = m.id AND e.user_id != m.user_id AND e.type = 'private'
+
+		JOIN users_data u
+  		ON u.id = m.user_id
+
+		JOIN messages mes
+		ON mes.id = ( 
+			SELECT id
+			FROM messages
+			WHERE messages.chat_id = e.id
+			ORDER BY messages.id DESC
+			LIMIT 1
+			)
+		ORDER BY mes.id ASC
+		`
 	rows, _ := db.DB.Query(query, userID)
 	defer rows.Close()
-
-	packet := []ChatInfo{}
-
 	for rows.Next() {
 		chat := ChatInfo{}
-
 		if err := rows.Scan(&chat.chat_id, &chat.to_id,
-			&chat.to_name, &chat.to_avatarPath); err != nil {
+			&chat.to_name, &chat.to_avatarPath,
+			&chat.last_message, &chat.last_message_time,
+			&chat.last_message_id); err != nil {
 			log.Fatal(err)
 		}
 		packet = append(packet, chat)
 	}
+
+	query =
+		`
+		SELECT e.id as "CHAT ID", e.id as "TO USER", u.title as "TITLE", u.avatar as "AVATAR",
+		mes.message as "TEXT", mes.time as "TIME", mes.id as "MESSAGE ID"
+		FROM chats e
+
+		JOIN chats_data u
+  		ON u.id = e.id AND e.user_id = ? AND e.type = 'group'
+
+		JOIN messages mes
+		ON mes.id = ( 
+			SELECT id
+			FROM messages
+			WHERE messages.chat_id = e.id
+			ORDER BY messages.id DESC
+			LIMIT 1
+			)
+		ORDER BY mes.id ASC
+		`
+	rows, _ = db.DB.Query(query, userID)
+
+	for rows.Next() {
+		chat := ChatInfo{}
+		if err := rows.Scan(&chat.chat_id, &chat.to_id,
+			&chat.to_name, &chat.to_avatarPath,
+			&chat.last_message, &chat.last_message_time,
+			&chat.last_message_id); err != nil {
+			log.Fatal(err, chat)
+		}
+		packet = append(packet, chat)
+	}
+
 	return packet
 }
