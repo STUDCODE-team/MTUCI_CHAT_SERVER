@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	// "strconv"
 )
@@ -8,6 +9,7 @@ import (
 var db Database
 
 func main() {
+	fmt.Println("SERVER STARTED")
 	db.handle()
 	startServer()
 }
