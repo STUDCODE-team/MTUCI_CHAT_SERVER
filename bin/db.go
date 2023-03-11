@@ -40,7 +40,7 @@ func (db *Database) getChatList(userID int) []ChatInfo {
 	packet := []ChatInfo{}
 	query :=
 		`
-		SELECT e.id as "CHAT ID", m.user_id as "TO USER", u.name as "TO NAME", u.avatar as "TO AVATAR",
+		SELECT e.id as "CHAT ID", m.user_id as "TO USER", CONCAT(u.name, ' ', u.surname) AS Name as "TO NAME", u.avatar as "TO AVATAR",
 		mes.message as "TEXT", mes.time as "TIME", mes.id as "MESSAGE ID"
 		FROM chats e
 
