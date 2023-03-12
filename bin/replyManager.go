@@ -27,6 +27,11 @@ func getChats(request string) []ChatInfo {
 }
 
 func getMessages(request string) []MessageInfo {
+	return db.getMessages(messageBody(request))
+}
+
+func newMessage(request string) string {
 	body := strings.Split(messageBody(request), ":")
-	return db.getMessages(body[0], body[1])
+	m := db.addMessage(body[0], body[1], body[2])
+	return m.getString()
 }

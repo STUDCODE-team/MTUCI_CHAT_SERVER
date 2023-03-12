@@ -108,29 +108,51 @@ func (db *Database) getChatList(userID int) []ChatInfo {
 	return packet
 }
 
-func (db *Database) getMessages(chatID, userID string) []MessageInfo {
+func (db *Database) getMessages(chatID string) []MessageInfo {
 	packet := []MessageInfo{}
 	query :=
 		`
-		SELECT message, user_id
-		FROM messages
-		WHERE messages.chat_id = ?
-		ORDER BY messages.id ASC
+		SELECT m.message, u.id, CONCAT(u.name, " ", u.surname), u.avatar, m.time
+		FROM messages m
+		JOIN users_data u
+		ON m.chat_id = ? AND m.user_id = u.id
+		ORDER BY m.id ASC
 		`
 	rows, _ := db.DB.Query(query, chatID)
 	defer rows.Close()
 	for rows.Next() {
-		mess := MessageInfo{}
-		err := rows.Scan(&mess.message, &mess.fromMe)
-		if mess.fromMe == userID {
-			mess.fromMe = "true"
-		} else {
-			mess.fromMe = "false"
-		}
+		m := MessageInfo{}
+		err := rows.Scan(&m.message, &m.fromID,
+			&m.fromName, &m.avatar, &m.time)
 		if err != nil {
 			log.Fatal(err)
 		}
-		packet = append(packet, mess)
+		packet = append(packet, m)
 	}
 	return packet
+}
+
+func (db *Database) addMessage(chatID, userID, message string) MessageInfo {
+	query :=
+		`
+		INSERT INTO messages (chat_id, user_id, message) VALUES (?,?,?)
+		`
+	result, _ := db.DB.Exec(query, chatID, userID, message)
+	id, _ := result.LastInsertId()
+	query =
+		`
+		SELECT m.message, u.id, CONCAT(u.name, " ", u.surname), u.avatar, m.time
+		FROM messages m
+		JOIN users_data u
+		ON m.id = ? AND m.user_id = u.id
+		`
+
+	row := db.DB.QueryRow(query, id)
+	m := MessageInfo{}
+	err := row.Scan(&m.message, &m.fromID,
+		&m.fromName, &m.avatar, &m.time)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return m
 }

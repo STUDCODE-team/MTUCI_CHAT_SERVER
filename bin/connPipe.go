@@ -82,6 +82,8 @@ func (pipe *ConnPipe) parseRequest(request string) {
 				pipe.write(message.getString())
 			}
 			///
+		case "newMessage":
+			pipe.write(newMessage(request))
 		default:
 			pipe.write("UNCURRENT REQUEST")
 		}
