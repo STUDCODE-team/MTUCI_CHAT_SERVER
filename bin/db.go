@@ -156,3 +156,19 @@ func (db *Database) addMessage(chatID, userID, message string) MessageInfo {
 	}
 	return m
 }
+
+func (db *Database) getUsersFromChat(chatID string) []string {
+	idList := make([]string, 0)
+	query :=
+		`
+		select user_id from chats where id = ?
+	`
+	rows, _ := db.DB.Query(query, chatID)
+
+	for rows.Next() {
+		var id string = ""
+		rows.Scan(&id)
+		idList = append(idList, id)
+	}
+	return idList
+}

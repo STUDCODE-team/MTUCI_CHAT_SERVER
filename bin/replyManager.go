@@ -30,8 +30,21 @@ func getMessages(request string) []MessageInfo {
 	return db.getMessages(messageBody(request))
 }
 
-func newMessage(request string) string {
+func newMessage(request string) {
 	body := strings.Split(messageBody(request), ":")
-	m := db.addMessage(body[0], body[1], body[2])
-	return m.getString()
+	chatID := body[0]
+	userID := body[1]
+	message := strings.Join(body[2:], "")
+	m := db.addMessage(chatID, userID, message)
+	/// отослать всем пользователям этого чата
+	idList := db.getUsersFromChat(chatID)
+	// fmt.Println(idList)
+	// fmt.Print(usersOnline)
+	for _, id := range idList {
+		pipe := usersOnline[id]
+		if pipe == nil {
+			continue
+		}
+		pipe.write(m.getString())
+	}
 }

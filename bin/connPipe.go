@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// [id] = pipe
+var usersOnline map[string]*ConnPipe = make(map[string]*ConnPipe)
+
 type ConnPipe struct {
 	con        net.Conn
 	authorized bool
@@ -68,7 +71,11 @@ func (pipe *ConnPipe) parseRequest(request string) {
 		///
 		case "login":
 			reply := login(request)
-			pipe.authorized = (messageBody(reply) != "fail")
+
+			if result := messageBody(reply); result != "fail" {
+				pipe.authorized = true
+				usersOnline[result] = pipe
+			}
 			pipe.write(reply)
 		///
 		case "getChatList":
@@ -83,7 +90,7 @@ func (pipe *ConnPipe) parseRequest(request string) {
 			}
 			///
 		case "newMessage":
-			pipe.write(newMessage(request))
+			newMessage(request)
 		default:
 			pipe.write("UNCURRENT REQUEST")
 		}
