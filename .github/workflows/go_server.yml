@@ -20,5 +20,5 @@ jobs:
         port: 22
         script: | 
           cd ~/scripts/
-          sh start_server.sh
+          sh start_server.sh &
 
