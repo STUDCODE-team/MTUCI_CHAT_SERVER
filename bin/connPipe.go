@@ -12,12 +12,13 @@ var usersOnline map[string]*ConnPipe = make(map[string]*ConnPipe)
 
 type ConnPipe struct {
 	con        net.Conn
+	id         string
 	authorized bool
 	replyChan  chan string
 }
 
 func newPipe(con net.Conn) {
-	pipe := ConnPipe{con, false, make(chan string)}
+	pipe := ConnPipe{con, "-1", false, make(chan string)}
 	go pipe.handle()
 }
 
@@ -29,25 +30,34 @@ func (pipe *ConnPipe) write(s string) {
 	pipe.con.Write([]byte(s + "#"))
 }
 
-func (pipe *ConnPipe) read() string {
+func (pipe *ConnPipe) read() (string, error) {
 	buf := make([]byte, 1024)
 	rlen, err := pipe.con.Read(buf) // get request
 	//error check
 	if err != nil {
-		return ""
+		pipe.close()
+		return "", net.ErrClosed
 	}
-	return string(buf[:rlen])
+	return string(buf[:rlen]), nil
 }
 
 func (pipe *ConnPipe) handle() {
-	defer pipe.close()
+	defer func() {
+		pipe.close()
+		delete(usersOnline, pipe.id)
+		db.closeSession(pipe.id)
+	}()
 	pipe.runRequestPipe()
 }
 
 func (pipe *ConnPipe) runRequestPipe() {
 	for {
 		time.Sleep(100 * time.Millisecond)
-		pipe.parseRequest(pipe.read())
+		read, err := pipe.read()
+		if err != nil {
+			return
+		}
+		pipe.parseRequest(read)
 	}
 }
 
@@ -74,6 +84,7 @@ func (pipe *ConnPipe) parseRequest(request string) {
 
 			if result := messageBody(reply); result != "fail" {
 				pipe.authorized = true
+				pipe.id = messageBody(reply)
 				usersOnline[result] = pipe
 			}
 			pipe.write(reply)
@@ -91,6 +102,10 @@ func (pipe *ConnPipe) parseRequest(request string) {
 			///
 		case "newMessage":
 			newMessage(request)
+			///
+		case "getSessionData":
+			pipe.write(getSessionData(request))
+			///
 		default:
 			pipe.write("UNCURRENT REQUEST")
 		}

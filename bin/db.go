@@ -30,6 +30,37 @@ func (db *Database) handle() {
 	}()
 }
 
+func (db *Database) authSession(id string) {
+	db.DB.QueryRow("INSERT INTO sessions(user_id, type) VALUES (?, ?)", id, "login")
+}
+
+func (db *Database) closeSession(id string) {
+	db.DB.QueryRow("INSERT INTO sessions(user_id, type) VALUES (?, ?)", id, "logout")
+}
+
+func (db *Database) getSessionData(user_id string) string {
+	query :=
+		`
+		SELECT type, time
+		FROM sessions
+		WHERE user_id = ? 
+		ORDER BY id DESC
+		LIMIT 1
+		`
+	rows, _ := db.DB.Query(query, user_id)
+	defer rows.Close()
+	isOnline := ""
+	time := ""
+	for rows.Next() {
+		rows.Scan(&isOnline, &time)
+	}
+	if isOnline == "" || time == "" {
+		isOnline = "logout"
+		time = "-1"
+	}
+	return isOnline + "|" + time
+}
+
 func (db *Database) authUser(login, hashedPassword string) (int, bool) {
 	id := 0
 	err := db.DB.QueryRow("SELECT id FROM users WHERE login=? AND hash=?", login, hashedPassword).Scan(&id)

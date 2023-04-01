@@ -15,6 +15,7 @@ func login(request string) string {
 	passwordHash := s[1]
 
 	if id, ok := db.authUser(login, passwordHash); ok {
+		db.authSession(strconv.Itoa(id))
 		return "login:" + strconv.Itoa(id)
 	} else {
 		return "login:fail"
@@ -24,6 +25,11 @@ func login(request string) string {
 func getChats(request string) []ChatInfo {
 	id, _ := strconv.Atoi(messageBody(request))
 	return db.getChatList(id)
+}
+
+func getSessionData(request string) string {
+	id := messageBody(request)
+	return "sessionData:" + db.getSessionData(id)
 }
 
 func getMessages(request string) []MessageInfo {
