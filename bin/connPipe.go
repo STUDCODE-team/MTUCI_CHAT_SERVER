@@ -36,7 +36,7 @@ func (pipe *ConnPipe) read() (string, error) {
 	//error check
 	if err != nil {
 		pipe.close()
-		return "", net.ErrClosed
+		return "", err
 	}
 	return string(buf[:rlen]), nil
 }
